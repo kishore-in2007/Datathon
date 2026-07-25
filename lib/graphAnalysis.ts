@@ -4,7 +4,7 @@ import betweennessCentrality from "graphology-metrics/centrality/betweenness";
 import { initDb } from "./db";
 
 export type NetworkData = {
-  nodes: { id: string; name: string; community: number; centrality: number; isHub: boolean }[];
+  nodes: { id: string; name: string; community: number; centrality: number; isHub: boolean; caseIds: number[] }[];
   edges: { source: string; target: string; weight: number }[];
 };
 
@@ -44,17 +44,37 @@ export async function getNetwork(personName?: string): Promise<NetworkData> {
   if (!graph.order) return { nodes: [], edges: [] };
   const communities = louvain(graph, { getEdgeWeight: "weight" });
   const centralities = betweennessCentrality(graph, { normalized: true });
+  const caseRows = await db.execute(`
+    SELECT person_id, GROUP_CONCAT(DISTINCT case_id) AS case_ids
+    FROM case_persons GROUP BY person_id
+  `);
+  const caseIdsByPerson = new Map(
+    caseRows.rows.map((row) => [
+      String(row.person_id),
+      String(row.case_ids || "").split(",").filter(Boolean).map(Number).sort((a, b) => a - b),
+    ]),
+  );
+  const communityLeaders = new Set<string>();
+  const communityGroups = new Map<number, string[]>();
+  for (const id of graph.nodes()) {
+    const community = communities[id];
+    communityGroups.set(community, [...(communityGroups.get(community) || []), id]);
+  }
+  for (const ids of communityGroups.values()) {
+    ids.sort((a, b) => (centralities[b] || 0) - (centralities[a] || 0));
+    ids.slice(0, Math.min(2, ids.length)).forEach((id) => communityLeaders.add(id));
+  }
   let keep = new Set(graph.nodes());
   if (personName) {
     const needle = personName.toLowerCase();
     const found = graph.nodes().find((id) => String(graph.getNodeAttribute(id, "name")).toLowerCase().includes(needle));
     if (found) keep = new Set([found, ...graph.neighbors(found), ...graph.neighbors(found).flatMap((id) => graph.neighbors(id))]);
   }
-  const max = Math.max(...Object.values(centralities), 0);
   return {
     nodes: graph.nodes().filter((id) => keep.has(id)).map((id) => ({
       id, name: String(graph.getNodeAttribute(id, "name")), community: communities[id],
-      centrality: Number((centralities[id] || 0).toFixed(4)), isHub: max > 0 && centralities[id] === max,
+      centrality: Number((centralities[id] || 0).toFixed(4)), isHub: communityLeaders.has(id),
+      caseIds: caseIdsByPerson.get(id) || [],
     })),
     edges: graph.edges().map((edge) => {
       const [source, target] = graph.extremities(edge);

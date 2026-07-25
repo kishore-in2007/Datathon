@@ -21,6 +21,64 @@ type CaseRow = {
   narrative: string; lat: number; lon: number; area: string; people: Person[];
 };
 
+const manualPeople = [
+  { name: "Arjun Dev", age: 34, gender: "Male", area: "Hebbal" },
+  { name: "Nandini Rao", age: 29, gender: "Female", area: "Yelahanka" },
+  { name: "Faisal Ahmed", age: 38, gender: "Male", area: "Peenya" },
+  { name: "Lakshmi Prasad", age: 42, gender: "Female", area: "Jalahalli" },
+  { name: "Rohan Das", age: 31, gender: "Male", area: "Hebbal" },
+  { name: "Meghana Joshi", age: 27, gender: "Female", area: "Yelahanka" },
+];
+
+const manualCases = [
+  ["MAN/2026/001", "2026-06-03", "vehicle theft", "Hebbal", "A white utility vehicle was stolen from a secured apartment parking area at 02:15. CCTV showed Arjun Dev coordinating with Faisal Ahmed while Rohan Das drove a second vehicle.", [["Arjun Dev","accused"],["Faisal Ahmed","accused"],["Rohan Das","accused"],["Lakshmi Prasad","witness"]]],
+  ["MAN/2026/002", "2026-06-07", "vehicle theft", "Yelahanka", "A motorcycle was removed outside Yelahanka New Town market. Nandini Rao identified Arjun Dev and Rohan Das from station photographs after observing them near the ignition lock.", [["Arjun Dev","accused"],["Rohan Das","accused"],["Nandini Rao","witness"]]],
+  ["MAN/2026/003", "2026-06-11", "theft", "Peenya", "Copper cable bundles were taken from an industrial storage yard. Entry records and camera footage placed Faisal Ahmed and Arjun Dev at the service gate shortly before the loss.", [["Faisal Ahmed","accused"],["Arjun Dev","accused"],["Lakshmi Prasad","witness"]]],
+  ["MAN/2026/004", "2026-06-15", "vehicle theft", "Jalahalli", "A delivery van disappeared during a driver changeover. Meghana Joshi reported seeing Rohan Das transfer the vehicle keys to Arjun Dev near the loading bay.", [["Rohan Das","accused"],["Arjun Dev","accused"],["Meghana Joshi","witness"]]],
+  ["MAN/2026/005", "2026-06-19", "cyber fraud", "Hebbal", "A fraudulent vehicle-sale listing collected advance payments from three complainants. The payment account was operated by Nandini Rao and login records were linked to Faisal Ahmed.", [["Nandini Rao","accused"],["Faisal Ahmed","accused"],["Lakshmi Prasad","victim"]]],
+  ["MAN/2026/006", "2026-06-23", "vehicle theft", "Peenya", "Two commercial motorcycles were removed from a warehouse compound. Toll-camera records connected Arjun Dev, Faisal Ahmed and Rohan Das to the transport vehicle.", [["Arjun Dev","accused"],["Faisal Ahmed","accused"],["Rohan Das","accused"]]],
+  ["MAN/2026/007", "2026-06-27", "theft", "Yelahanka", "Electronic diagnostic equipment was stolen from a repair workshop after closing. Meghana Joshi provided footage showing Nandini Rao meeting Arjun Dev outside the premises.", [["Nandini Rao","accused"],["Arjun Dev","accused"],["Meghana Joshi","witness"]]],
+  ["MAN/2026/008", "2026-07-01", "vehicle theft", "Hebbal", "A sedan was stolen using a cloned key near Hebbal flyover. Traffic video showed Arjun Dev driving with Faisal Ahmed following on a motorcycle.", [["Arjun Dev","accused"],["Faisal Ahmed","accused"],["Lakshmi Prasad","victim"]]],
+  ["MAN/2026/009", "2026-07-04", "chain-snatching", "Jalahalli", "A gold chain was taken from a pedestrian near the metro entrance. Nandini Rao witnessed Rohan Das riding the motorcycle and identified Arjun Dev as the pillion rider.", [["Rohan Das","accused"],["Arjun Dev","accused"],["Nandini Rao","witness"]]],
+  ["MAN/2026/010", "2026-07-07", "vehicle theft", "Yelahanka", "A rental vehicle was obtained with forged identification and not returned. Documents used Faisal Ahmed's photograph, while location records showed meetings with Arjun Dev.", [["Faisal Ahmed","accused"],["Arjun Dev","accused"],["Meghana Joshi","witness"]]],
+  ["MAN/2026/011", "2026-07-10", "narcotics", "Peenya", "A vehicle intercepted near the industrial ring road contained packaged narcotics. Arjun Dev was driving and Rohan Das occupied the passenger seat; Faisal Ahmed was linked through call records.", [["Arjun Dev","accused"],["Rohan Das","accused"],["Faisal Ahmed","accused"]]],
+  ["MAN/2026/012", "2026-07-12", "theft", "Hebbal", "Number plates and vehicle control modules were recovered from a rented garage. The lease named Nandini Rao and fingerprints matched Arjun Dev and Faisal Ahmed.", [["Nandini Rao","accused"],["Arjun Dev","accused"],["Faisal Ahmed","accused"]]],
+  ["MAN/2026/013", "2026-07-14", "vehicle theft", "Jalahalli", "A hatchback stolen from a hospital parking area was recovered with altered plates. Rohan Das was detained nearby and messages connected him to Arjun Dev.", [["Rohan Das","accused"],["Arjun Dev","accused"],["Lakshmi Prasad","victim"]]],
+  ["MAN/2026/014", "2026-07-16", "cyber fraud", "Yelahanka", "Online advertisements offered stolen vehicle components. The seller account belonged to Nandini Rao and delivery records identified Faisal Ahmed as the dispatcher.", [["Nandini Rao","accused"],["Faisal Ahmed","accused"],["Meghana Joshi","witness"]]],
+  ["MAN/2026/015", "2026-07-18", "vehicle theft", "Peenya", "A truck tractor was taken during an overnight halt. CCTV placed Arjun Dev, Faisal Ahmed and Rohan Das around the cab before departure.", [["Arjun Dev","accused"],["Faisal Ahmed","accused"],["Rohan Das","accused"]]],
+  ["MAN/2026/016", "2026-07-20", "assault", "Hebbal", "A workshop owner was assaulted after confronting persons handling suspected stolen parts. The complainant named Arjun Dev and Rohan Das; Nandini Rao witnessed the dispute.", [["Arjun Dev","accused"],["Rohan Das","accused"],["Nandini Rao","witness"],["Lakshmi Prasad","victim"]]],
+  ["MAN/2026/017", "2026-07-22", "vehicle theft", "Yelahanka", "Police recovered two stolen motorcycles during a warehouse search. Arjun Dev held the keys, Faisal Ahmed maintained the inventory, and Meghana Joshi documented prior vehicle movements.", [["Arjun Dev","accused"],["Faisal Ahmed","accused"],["Meghana Joshi","witness"]]],
+  ["MAN/2026/018", "2026-07-24", "theft", "Jalahalli", "A coordinated search recovered cloned keys, number plates and ownership documents. Evidence connected Arjun Dev, Faisal Ahmed, Rohan Das and Nandini Rao across the earlier FIRs.", [["Arjun Dev","accused"],["Faisal Ahmed","accused"],["Rohan Das","accused"],["Nandini Rao","accused"]]],
+] as const;
+
+async function ensureManualCases() {
+  const db = await initDb();
+  const existing = await db.execute("SELECT COUNT(*) AS count FROM cases WHERE fir_no LIKE 'MAN/2026/%'");
+  if (Number(existing.rows[0]?.count || 0) >= manualCases.length) return false;
+  const personStatements = manualPeople.map((person) => ({
+    sql: `INSERT INTO persons (name,age,gender,address_area)
+      SELECT ?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM persons WHERE name=?)`,
+    args: [person.name, person.age, person.gender, person.area, person.name],
+  }));
+  await db.batch(personStatements, "write");
+  for (const [fir, date, crime, area, narrative, people] of manualCases) {
+    const already = await db.execute({ sql: "SELECT 1 FROM cases WHERE fir_no=? LIMIT 1", args: [fir] });
+    if (already.rows.length) continue;
+    const place = places["Bengaluru North"];
+    await db.batch([
+      { sql: "INSERT INTO cases (fir_no,district,station,date_reported,crime_type,status,narrative) VALUES (?,'Bengaluru North',?,?,?,?,?)",
+        args: [fir, `${area} Police Station`, date, crime, "under_investigation", narrative] },
+      { sql: "INSERT INTO locations (case_id,lat,lon,area_name) VALUES ((SELECT case_id FROM cases WHERE fir_no=?),?,?,?)",
+        args: [fir, place.lat, place.lon, area] },
+      ...people.map(([name, role]) => ({
+        sql: "INSERT INTO case_persons (case_id,person_id,role) SELECT c.case_id,p.person_id,? FROM cases c,persons p WHERE c.fir_no=? AND p.name=? ORDER BY p.person_id LIMIT 1",
+        args: [role, fir, name],
+      })),
+    ], "write");
+  }
+  return true;
+}
+
 export async function seedDatabase() {
   const db = await initDb();
   const existing = await db.execute("SELECT COUNT(*) AS count FROM cases");
@@ -91,6 +149,7 @@ export async function seedDatabase() {
     ]);
     await db.batch(statements, "write");
   }
+  const manualSeeded = await ensureManualCases();
   await db.batch([
     "DELETE FROM network_edges",
     `UPDATE case_persons SET person_id = (
@@ -103,5 +162,6 @@ export async function seedDatabase() {
     FROM case_persons a JOIN case_persons b ON a.case_id=b.case_id AND a.person_id<b.person_id
     GROUP BY a.person_id,b.person_id`,
   ], "write");
-  return { seeded: count < rows.length, cases: rows.length };
+  const finalCount = await db.execute("SELECT COUNT(*) AS count FROM cases");
+  return { seeded: count < rows.length || manualSeeded, cases: Number(finalCount.rows[0]?.count || 0), manualCases: manualCases.length };
 }

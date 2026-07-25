@@ -38,10 +38,11 @@ export default function ChatWindow({ role }: { role: Role }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
   const showNotice = useCallback((text: string) => { setNotice(text); window.setTimeout(() => setNotice(""), 3500); }, []);
+  const navigateTo = useCallback((destination: Tab) => setTab(destination), []);
 
   const submit = useCallback(async (text: string) => {
     const clean = text.trim(); if (!clean || loading) return;
-    const history = messages.slice(-8).map(({ role: messageRole, content }) => ({ role: messageRole, content }));
+    const history = messages.slice(-10).map(({ role: messageRole, content }) => ({ role: messageRole, content }));
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: clean }]);
     setInput(""); setLoading(true); setTab("chat");
     try {
@@ -52,13 +53,14 @@ export default function ChatWindow({ role }: { role: Role }) {
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: answer, sql: data.sql }]);
       if (data.networkData) setNetworkData(data.networkData);
       if (data.predictionData) setPredictionData(data.predictionData);
+      if (data.action === "switchTab" && tabs.some((item) => item.id === data.tab)) navigateTo(data.tab as Tab);
       if (voiceReply && "speechSynthesis" in window) {
         speechSynthesis.cancel(); const speech = new SpeechSynthesisUtterance(answer);
         speech.lang = language; speech.rate = 0.95; speechSynthesis.speak(speech);
       }
     } catch { setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: "The service is temporarily unreachable." }]); }
     finally { setLoading(false); }
-  }, [language, loading, messages, role, voiceReply]);
+  }, [language, loading, messages, navigateTo, role, voiceReply]);
 
   async function exportPdf() {
     try {
