@@ -39,8 +39,16 @@ export default function VoiceButton({
   const [listening, setListening] = useState(false);
   const recognition = useRef<Recognition | null>(null);
   const gotResult = useRef(false);
+  const transcriptHandler = useRef(onTranscript);
+  const errorHandler = useRef(onError);
 
   useEffect(() => {
+    transcriptHandler.current = onTranscript;
+    errorHandler.current = onError;
+  }, [onError, onTranscript]);
+
+  useEffect(() => {
+    let mounted = true;
     const Constructor = window.SpeechRecognition || window.webkitSpeechRecognition;
     setSupported(Boolean(Constructor));
     if (!Constructor) return;
@@ -50,16 +58,25 @@ export default function VoiceButton({
     instance.continuous = false;
     instance.onresult = (event) => {
       gotResult.current = true;
-      onTranscript(event.results[0][0].transcript.trim());
+      transcriptHandler.current(event.results[0][0].transcript.trim());
     };
-    instance.onerror = () => onError("I couldn’t hear that clearly. Please try again or type your question.");
+    instance.onerror = () => {
+      if (mounted) errorHandler.current("I couldn’t hear that clearly. Please try again or type your question.");
+    };
     instance.onend = () => {
+      if (!mounted) return;
       setListening(false);
-      if (!gotResult.current) onError("No speech detected. You can try the mic again or use the text box.");
+      if (!gotResult.current) errorHandler.current("No speech detected. You can try the mic again or use the text box.");
     };
     recognition.current = instance;
-    return () => instance.stop();
-  }, [language, onError, onTranscript]);
+    return () => {
+      mounted = false;
+      instance.onresult = null;
+      instance.onerror = null;
+      instance.onend = null;
+      instance.stop();
+    };
+  }, [language]);
 
   if (!supported) return null;
 

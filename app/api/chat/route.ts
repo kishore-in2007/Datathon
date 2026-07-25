@@ -20,7 +20,9 @@ Return ONLY one JSON object:
 {"type":"network","personName":"optional name"} for relationship/hub questions;
 {"type":"predictive","district":"...","crimeType":"..."} for forecast, trend, rising, risk, or hotspot questions;
 {"type":"conversational","answer":"..."} otherwise.
-SQL must be a single SQLite SELECT using only the schema. Never query audit_log. Use explicit joins and LIMIT 50.`;
+SQL must be a single SQLite SELECT using only the schema. Never query audit_log. Use explicit joins and LIMIT 50.
+For "this month", use date_reported >= date('now','start of month') and date_reported < date('now','start of month','+1 month').
+For counts, return one numeric column aliased as case_count.`;
 
 const empty = { sql: null, rows: [], networkData: null, predictionData: null };
 
@@ -62,6 +64,18 @@ export async function POST(request: NextRequest) {
     const result = await (await initDb()).execute(sql);
     const rows = result.rows.map((row) => ({ ...row }));
     await appendAuditLog({ role, queryText: message, sqlExecuted: sql });
+    if (rows.length === 1) {
+      const countEntry = Object.entries(rows[0]).find(([key, value]) =>
+        /^(case_)?count$|^total(_cases)?$/i.test(key) && typeof value === "number",
+      );
+      if (countEntry) {
+        const count = Number(countEntry[1]);
+        return NextResponse.json({
+          answer: `The database query found ${count} matching case${count === 1 ? "" : "s"}.`,
+          sql, rows, networkData: null, predictionData: null,
+        });
+      }
+    }
     const summary = await callGemini(`Summarize these synthetic crime database results for an investigator.
 Question: ${message}\nSQL: ${sql}\nRows: ${JSON.stringify(rows)}
 Return ONLY JSON {"answer":"concise factual answer"}. Never invent missing facts.`);
