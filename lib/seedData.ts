@@ -53,7 +53,11 @@ const manualCases = [
 
 async function ensureManualCases() {
   const db = await initDb();
-  const existing = await db.execute("SELECT COUNT(*) AS count FROM cases WHERE fir_no LIKE 'MAN/2026/%'");
+  const manualFirs = manualCases.map(([fir]) => fir);
+  const existing = await db.execute({
+    sql: `SELECT COUNT(*) AS count FROM cases WHERE fir_no IN (${manualFirs.map(() => "?").join(",")})`,
+    args: manualFirs,
+  });
   if (Number(existing.rows[0]?.count || 0) >= manualCases.length) return false;
   const personStatements = manualPeople.map((person) => ({
     sql: `INSERT INTO persons (name,age,gender,address_area)
