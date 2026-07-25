@@ -25,7 +25,6 @@ export async function seedDatabase() {
   const db = await initDb();
   const existing = await db.execute("SELECT COUNT(*) AS count FROM cases");
   const count = Number(existing.rows[0]?.count || 0);
-  if (count) return { seeded: false, cases: count };
   state = 72451;
   const rows: CaseRow[] = [];
   const trendWeeks = [3, 6, 9, 12, 15, 18, 21, 24];
@@ -77,7 +76,7 @@ export async function seedDatabase() {
   }
 
   // Turso batch limits favor small transactional chunks.
-  for (let offset = 0; offset < rows.length; offset += 25) {
+  for (let offset = Math.min(count, rows.length); offset < rows.length; offset += 25) {
     const statements = rows.slice(offset, offset + 25).flatMap((row) => [
       { sql: "INSERT INTO cases (fir_no,district,station,date_reported,crime_type,status,narrative) VALUES (?,?,?,?,?,?,?)",
         args: [row.fir, row.district, row.station, row.date, row.crime, row.status, row.narrative] },
@@ -93,6 +92,7 @@ export async function seedDatabase() {
     await db.batch(statements, "write");
   }
   await db.batch([
+    "DELETE FROM network_edges",
     `UPDATE case_persons SET person_id = (
       SELECT MIN(p2.person_id) FROM persons p2
       WHERE p2.name = (SELECT p1.name FROM persons p1 WHERE p1.person_id = case_persons.person_id)
@@ -103,5 +103,5 @@ export async function seedDatabase() {
     FROM case_persons a JOIN case_persons b ON a.case_id=b.case_id AND a.person_id<b.person_id
     GROUP BY a.person_id,b.person_id`,
   ], "write");
-  return { seeded: true, cases: rows.length };
+  return { seeded: count < rows.length, cases: rows.length };
 }
