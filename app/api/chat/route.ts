@@ -37,10 +37,23 @@ function directCountQuery(message: string) {
   const district = districtNames.find((value) => normalized.includes(value.toLowerCase()));
   const crime = crimeNames.find((value) => normalized.includes(value));
   if (!district || !crime) return null;
-  const monthFilter = /\b(this|current) month\b/i.test(message)
-    ? " AND date_reported >= date('now','start of month') AND date_reported < date('now','start of month','+1 month')"
-    : "";
+  const monthFilter = /\blast month\b/i.test(message)
+    ? " AND date_reported >= date('now','start of month','-1 month') AND date_reported < date('now','start of month')"
+    : /\b(this|current) month\b/i.test(message)
+      ? " AND date_reported >= date('now','start of month') AND date_reported < date('now','start of month','+1 month')"
+      : "";
   return `SELECT COUNT(case_id) AS case_count FROM cases WHERE district = '${district}' AND crime_type = '${crime}'${monthFilter} LIMIT 50`;
+}
+
+function followupCountQuery(message: string, history: unknown[]) {
+  if (!/\b(last|this|current) month\b/i.test(message) || !/\b(narrow|filter|limit|only|that)\b/i.test(message)) return null;
+  for (const item of [...history].reverse()) {
+    const candidate = item as { role?: unknown; content?: unknown } | null;
+    if (candidate?.role === "user" && typeof candidate.content === "string") {
+      return directCountQuery(`${candidate.content} ${message}`);
+    }
+  }
+  return null;
 }
 
 function directTabAction(message: string) {
@@ -87,6 +100,17 @@ async function getGroundedDetails(message: string, history: unknown[]) {
   return result.rows.map((row) => ({ ...row }));
 }
 
+function formatGroundedAnswer(rows: Record<string, unknown>[]) {
+  if (!rows.length) return null;
+  const first = rows[0];
+  if (!first.fir_no) return null;
+  const names = [...new Map(rows.filter((row) => row.name).map((row) => [String(row.name), String(row.role || "linked person")])).entries()];
+  const people = names.map(([name, role]) => `${name} (${role})`).join(", ");
+  const location = first.area_name ? `${String(first.area_name)}, ${String(first.district || "")}` : String(first.district || "the recorded district");
+  const narrative = first.narrative ? ` Recorded account: ${String(first.narrative)}` : "";
+  return `Case ${String(first.fir_no)} was reported on ${String(first.date_reported)} at ${location}. ${people ? `People recorded in the case are ${people}.` : "No linked persons were returned."}${narrative}`;
+}
+
 export async function POST(request: NextRequest) {
   const role = await getSessionRole();
   if (!role) return NextResponse.json({ answer: "Your session has expired. Please sign in again.", ...empty }, { status: 401 });
@@ -97,7 +121,7 @@ export async function POST(request: NextRequest) {
     if (!message) return NextResponse.json({ answer: "Please enter a question.", ...empty }, { status: 400 });
     const history = Array.isArray(body.history) ? body.history.slice(-10) : [];
     const conversation = JSON.stringify(history);
-    const directSql = directCountQuery(message);
+    const directSql = followupCountQuery(message, history) || directCountQuery(message);
     const tabAction = directTabAction(message);
     const plan: Awaited<ReturnType<typeof callGemini>> = tabAction || (directSql
       ? { type: "sql" as const, sql: directSql, explanation: "Deterministic canonical count query" }
@@ -153,6 +177,10 @@ Return ONLY JSON {"answer":"detailed grounded answer"}.`);
       }
     }
     const groundedRows = needsGroundedDetails(message) ? await getGroundedDetails(message, history) : [];
+    const groundedAnswer = formatGroundedAnswer(groundedRows);
+    if (groundedAnswer) {
+      return NextResponse.json({ answer: groundedAnswer, sql, rows, networkData: null, predictionData: null, action: null, tab: null });
+    }
     const summary = await callGemini(`Summarize these synthetic crime database results for an investigator.
 Last five conversation turns: ${conversation}\nQuestion: ${message}\nSQL: ${sql}\nSQL rows: ${JSON.stringify(rows)}
 Grounded case/person/location rows: ${JSON.stringify(groundedRows)}
