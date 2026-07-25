@@ -3,14 +3,18 @@ import { canUse, getSessionRole } from "@/lib/auth";
 import { getNetwork } from "@/lib/graphAnalysis";
 
 export const runtime = "nodejs";
-export async function GET(request: Request) {
+export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
   const role = await getSessionRole();
   if (!role) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   if (!canUse(role, "network")) return NextResponse.json({ message: "SHO- or SP-level access is required." }, { status: 403 });
   try {
-    return NextResponse.json(await getNetwork(new URL(request.url).searchParams.get("person") || undefined));
-  } catch (error) {
-    console.error("Network error:", error);
-    return NextResponse.json({ message: "Network analysis is temporarily unavailable." }, { status: 500 });
+    const data = await getNetwork(new URL(req.url).searchParams.get("person") || undefined);
+    console.log(`[api/network] nodes=${data.nodes.length} edges=${data.edges.length}`);
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error("Network error:", err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

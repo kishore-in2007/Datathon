@@ -8,7 +8,25 @@ export type NetworkData = {
   edges: { source: string; target: string; weight: number }[];
 };
 
+export async function ensureNetworkEdges() {
+  const db = await initDb();
+  const existing = await db.execute("SELECT COUNT(*) AS count FROM network_edges");
+  const count = Number(existing.rows[0]?.count || 0);
+  if (count > 0) return count;
+
+  await db.execute(`
+    INSERT INTO network_edges (person_a, person_b, shared_case_id, weight)
+    SELECT a.person_id, b.person_id, MIN(a.case_id), COUNT(DISTINCT a.case_id)
+    FROM case_persons a
+    JOIN case_persons b ON a.case_id = b.case_id AND a.person_id < b.person_id
+    GROUP BY a.person_id, b.person_id
+  `);
+  const rebuilt = await db.execute("SELECT COUNT(*) AS count FROM network_edges");
+  return Number(rebuilt.rows[0]?.count || 0);
+}
+
 export async function getNetwork(personName?: string): Promise<NetworkData> {
+  await ensureNetworkEdges();
   const db = await initDb();
   const result = await db.execute(`
     SELECT ne.person_a, pa.name AS name_a, ne.person_b, pb.name AS name_b, ne.weight
