@@ -45,6 +45,19 @@ function directCountQuery(message: string) {
   return `SELECT COUNT(case_id) AS case_count FROM cases WHERE district = '${district}' AND crime_type = '${crime}'${monthFilter} LIMIT 50`;
 }
 
+function directCaseDetailsQuery(message: string, history: unknown[]) {
+  if (!needsGroundedDetails(message)) return null;
+  const context = `${JSON.stringify(history)} ${message}`;
+  const firs = context.match(/\b[A-Z]{3}\/\d{4}\/(?:\d{3,4}|NET\d+)\b/gi);
+  const fir = firs?.at(-1)?.toUpperCase();
+  if (!fir) return null;
+  return `SELECT c.case_id,c.fir_no,c.date_reported,c.district,c.station,c.crime_type,c.status,c.narrative,
+    p.person_id,p.name,cp.role,l.area_name,l.lat,l.lon
+    FROM cases c JOIN case_persons cp ON cp.case_id=c.case_id
+    JOIN persons p ON p.person_id=cp.person_id LEFT JOIN locations l ON l.case_id=c.case_id
+    WHERE c.fir_no='${fir}' ORDER BY p.name LIMIT 50`;
+}
+
 function followupCountQuery(message: string, history: unknown[]) {
   if (!/\b(last|this|current) month\b/i.test(message) || !/\b(narrow|filter|limit|only|that)\b/i.test(message)) return null;
   for (const item of [...history].reverse()) {
@@ -121,7 +134,7 @@ export async function POST(request: NextRequest) {
     if (!message) return NextResponse.json({ answer: "Please enter a question.", ...empty }, { status: 400 });
     const history = Array.isArray(body.history) ? body.history.slice(-10) : [];
     const conversation = JSON.stringify(history);
-    const directSql = followupCountQuery(message, history) || directCountQuery(message);
+    const directSql = directCaseDetailsQuery(message, history) || followupCountQuery(message, history) || directCountQuery(message);
     const tabAction = directTabAction(message);
     const plan: Awaited<ReturnType<typeof callGemini>> = tabAction || (directSql
       ? { type: "sql" as const, sql: directSql, explanation: "Deterministic canonical count query" }
