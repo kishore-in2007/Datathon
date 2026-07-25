@@ -34,7 +34,9 @@ export default function ChatWindow({ role }: { role: Role }) {
   const [networkData, setNetworkData] = useState<NetworkData | null>(null);
   const [predictionData, setPredictionData] = useState<PredictionData | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), [messages, loading]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
   const showNotice = useCallback((text: string) => { setNotice(text); window.setTimeout(() => setNotice(""), 3500); }, []);
 
   const submit = useCallback(async (text: string) => {
