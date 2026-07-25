@@ -26,6 +26,21 @@ For counts, return one numeric column aliased as case_count.`;
 
 const empty = { sql: null, rows: [], networkData: null, predictionData: null };
 
+const districtNames = ["Bengaluru North", "Bengaluru South", "Mysuru", "Mangaluru", "Hubballi"];
+const crimeNames = ["chain-snatching", "cyber fraud", "theft", "narcotics", "assault", "vehicle theft"];
+
+function directCountQuery(message: string) {
+  if (!/\b(how many|count|number of)\b/i.test(message)) return null;
+  const normalized = message.toLowerCase().replace(/chain[ -]snatching/g, "chain-snatching");
+  const district = districtNames.find((value) => normalized.includes(value.toLowerCase()));
+  const crime = crimeNames.find((value) => normalized.includes(value));
+  if (!district || !crime) return null;
+  const monthFilter = /\b(this|current) month\b/i.test(message)
+    ? " AND date_reported >= date('now','start of month') AND date_reported < date('now','start of month','+1 month')"
+    : "";
+  return `SELECT COUNT(case_id) AS case_count FROM cases WHERE district = '${district}' AND crime_type = '${crime}'${monthFilter} LIMIT 50`;
+}
+
 export async function POST(request: NextRequest) {
   const role = await getSessionRole();
   if (!role) return NextResponse.json({ answer: "Your session has expired. Please sign in again.", ...empty }, { status: 401 });
@@ -35,7 +50,10 @@ export async function POST(request: NextRequest) {
     message = typeof body.message === "string" ? body.message.trim().slice(0, 2000) : "";
     if (!message) return NextResponse.json({ answer: "Please enter a question.", ...empty }, { status: 400 });
     const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
-    const plan = await callGemini(`${system}\nConversation: ${JSON.stringify(history)}\nQuestion: ${message}`);
+    const directSql = directCountQuery(message);
+    const plan = directSql
+      ? { type: "sql" as const, sql: directSql, explanation: "Deterministic canonical count query" }
+      : await callGemini(`${system}\nConversation: ${JSON.stringify(history)}\nQuestion: ${message}`);
     const type = plan.type || (plan.sql ? "sql" : "conversational");
     if (type === "network") {
       if (!canUse(role, "network")) return NextResponse.json({ answer: "Network analysis requires SHO- or SP-level access.", ...empty });
